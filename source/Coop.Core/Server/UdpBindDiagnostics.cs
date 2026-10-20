@@ -68,10 +68,21 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
         }
     }
 
-    // Mirrors LiteNetLib's exclusive IPv4 bind, otherwise a holder on one address would read as a free port.
+    // Mirrors LiteNetLib's exclusive IPv4 and IPv6 binds, otherwise a holder on one address family would read as a free port.
     internal static SocketError? Probe(int port)
     {
-        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        SocketError? v4Error = ProbeAddress(AddressFamily.InterNetwork, IPAddress.Any, port, disableDualMode: false);
+        if (v4Error != null || !Socket.OSSupportsIPv6)
+        {
+            return v4Error;
+        }
+
+        return ProbeAddress(AddressFamily.InterNetworkV6, IPAddress.IPv6Any, port, disableDualMode: true);
+    }
+
+    private static SocketError? ProbeAddress(AddressFamily family, IPAddress bindAddress, int port, bool disableDualMode)
+    {
+        using var socket = new Socket(family, SocketType.Dgram, ProtocolType.Udp);
         try
         {
             socket.ExclusiveAddressUse = true;
@@ -81,9 +92,21 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
             // LiteNetLib ignores a failure here too; the bind still reports the error.
         }
 
+        if (disableDualMode)
+        {
+            try
+            {
+                socket.DualMode = false;
+            }
+            catch (Exception)
+            {
+                // LiteNetLib ignores a failure here too.
+            }
+        }
+
         try
         {
-            socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            socket.Bind(new IPEndPoint(bindAddress, port));
             return null;
         }
         catch (SocketException ex)

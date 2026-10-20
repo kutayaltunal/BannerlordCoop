@@ -18,7 +18,11 @@ public class CoopConnectMenuVMTests
     [InlineData("localhost:4300", "localhost", 4300)]
     [InlineData("127.0.0.1:4400", "127.0.0.1", 4400)]
     [InlineData("::1", "::1", 4200)]
+    [InlineData("[::1]", "::1", 4200)]
     [InlineData("[::1]:4500", "::1", 4500)]
+    [InlineData("2001:db8::1", "2001:db8::1", 4200)]
+    [InlineData("[2001:db8::1]", "2001:db8::1", 4200)]
+    [InlineData("[2001:db8::1]:4200", "2001:db8::1", 4200)]
     public void TryParseServerAddress_UsesAttachedPortOrDefault(
         string enteredAddress,
         string expectedHost,
@@ -40,6 +44,12 @@ public class CoopConnectMenuVMTests
     [InlineData("localhost:0")]
     [InlineData("localhost:65536")]
     [InlineData("[::1]:invalid")]
+    [InlineData("[invalid]")]
+    [InlineData("[127.0.0.1]")]
+    [InlineData("2001:db8::1]")]
+    [InlineData("[2001:db8::1")]
+    [InlineData("999.999.999.999")]
+    [InlineData("999.999.999.999:4200")]
     public void TryParseServerAddress_RejectsInvalidAddressesAndPorts(string enteredAddress)
     {
         Assert.False(CoopConnectMenuVM.TryParseServerAddress(
@@ -49,9 +59,19 @@ public class CoopConnectMenuVMTests
     }
 
     [Theory]
-    [InlineData("127.0.0.1", 4200)]
-    [InlineData("127.0.0.1:4300", 4300)]
-    public void DirectConnect_PublishesAndSavesAttachedPortOrDefault(string enteredAddress, int expectedPort)
+    [InlineData("127.0.0.1", "127.0.0.1", 4200)]
+    [InlineData("127.0.0.1:4300", "127.0.0.1", 4300)]
+    [InlineData("::1", "::1", 4200)]
+    [InlineData("[::1]", "::1", 4200)]
+    [InlineData("[::1]:4500", "::1", 4500)]
+    [InlineData("2001:db8::1", "2001:db8::1", 4200)]
+    [InlineData("[2001:db8::1]", "2001:db8::1", 4200)]
+    [InlineData("[2001:db8::1]:4600", "2001:db8::1", 4600)]
+    [InlineData("::ffff:127.0.0.1", "127.0.0.1", 4200)]
+    public void DirectConnect_PublishesAndSavesAttachedPortOrDefault(
+        string enteredAddress,
+        string expectedResolvedIp,
+        int expectedPort)
     {
         var browser = new TestSteamLobbyBrowser();
         var optionsStore = new TestCoopOptionsStore();
@@ -67,7 +87,7 @@ public class CoopConnectMenuVMTests
         viewModel.ActionConnect();
 
         Assert.NotNull(publishedJoin);
-        Assert.Equal("127.0.0.1", publishedJoin.Address.ToString());
+        Assert.Equal(expectedResolvedIp, publishedJoin.Address.ToString());
         Assert.Equal(expectedPort, publishedJoin.Port);
         Assert.True(optionsStore.LoadOrDefault().TryGetSection(
             CoopConnectMenuVM.OptionsTabId,

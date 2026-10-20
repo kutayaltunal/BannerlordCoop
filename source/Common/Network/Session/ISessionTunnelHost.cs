@@ -41,8 +41,16 @@ public static class TunnelAdvertisement
 
     public static bool IsLoopbackAddress(string address)
     {
-        return address == "localhost" ||
-            (IPAddress.TryParse(address, out var ip) && IPAddress.IsLoopback(ip));
+        if (string.IsNullOrWhiteSpace(address)) return false;
+
+        string normalized = address.Trim();
+        if (normalized.Length >= 2 && normalized[0] == '[' && normalized[normalized.Length - 1] == ']')
+        {
+            normalized = normalized.Substring(1, normalized.Length - 2);
+        }
+
+        return string.Equals(normalized, "localhost", StringComparison.OrdinalIgnoreCase) ||
+            (IPAddress.TryParse(normalized, out var ip) && IPAddress.IsLoopback(ip));
     }
 }
 

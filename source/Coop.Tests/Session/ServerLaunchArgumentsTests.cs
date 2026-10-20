@@ -1,4 +1,4 @@
-using Common.Network;
+﻿using Common.Network;
 using Common.Network.Session;
 using Coop.Core.Common.Session;
 using Xunit;
@@ -24,7 +24,12 @@ public class ServerLaunchArgumentsTests
     [InlineData("localhost", "localhost", 4200)]
     [InlineData("localhost:4300", "localhost", 4300)]
     [InlineData("127.0.0.1:4200", "127.0.0.1", 4200)]
+    [InlineData("::1", "::1", 4200)]
+    [InlineData("[::1]", "::1", 4200)]
     [InlineData("[::1]:4400", "::1", 4400)]
+    [InlineData("2001:db8::1", "2001:db8::1", 4200)]
+    [InlineData("[2001:db8::1]", "2001:db8::1", 4200)]
+    [InlineData("[2001:db8::1]:4500", "2001:db8::1", 4500)]
     public void AutoConnectUsesSharedAddressParserAndDefaultPort(string endpoint, string host, int port)
     {
         Assert.True(ServerLaunchArguments.TryParseAutoConnect(new[] { "Bannerlord.exe", "/AuToCoNnEcT", endpoint }, out bool requested, out var config));

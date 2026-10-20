@@ -361,8 +361,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     {
         if (!TryParseServerAddress(connectIP, out var host, out var port))
         {
+            Logger.Warning("Invalid server address entered in direct connect menu: {EnteredAddress}", connectIP);
             InformationManager.DisplayMessage(new InformationMessage(
-                "ERROR: Enter a valid server address with an optional port"));
+                "ERROR: Enter a valid IPv4/IPv6 server address or hostname with an optional port"));
             return;
         }
 
@@ -377,22 +378,13 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         {
             bool steamInvites = SessionDiscovery.SteamAvailable && IsLoopbackAddress(host);
 
-            IPAddress ip;
+            IPAddress ip = ResolveHostAddress(host);
 
-            if (IPAddress.TryParse(host, out var enteredIp))
+            if (ip == null)
             {
-                ip = enteredIp;
-            }
-            else
-            {
-                var addresses = Dns.GetHostAddresses(host);
-                ip = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
-
-                if (ip == null)
-                {
-                    InformationManager.DisplayMessage(new InformationMessage("ERROR: No IPv4 address found for host"));
-                    return;
-                }
+                Logger.Error("No usable IPv4 or IPv6 address found for host {Host}", host);
+                InformationManager.DisplayMessage(new InformationMessage("ERROR: No IPv4 or IPv6 address found for host"));
+                return;
             }
 
             messageBroker.Publish(this, new AttemptJoin(ip, port, connectPassword, steamInvites));
@@ -400,6 +392,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
         catch (Exception ex)
         {
+            Logger.Error(ex, "Failed to resolve connection address {EnteredAddress} (host={Host}, port={Port})", connectIP, host, port);
             InformationManager.DisplayMessage(new InformationMessage(
                 $"ERROR: The connection address could not be resolved: {ex.Message}"));
         }
@@ -651,25 +644,154 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             int closingBracket = address.IndexOf(']');
             if (closingBracket <= 1) return false;
 
-            host = address.Substring(1, closingBracket - 1);
-            string suffix = address.Substring(closingBracket + 1);
-            if (suffix.Length == 0) return true;
+            string bracketedHost = address.Substring(1, closingBracket - 1).Trim();
+            if (!TryParseLiteralIpAddress(bracketedHost, out var bracketedIp) ||
+                bracketedIp.AddressFamily != AddressFamily.InterNetworkV6)
+            {
+                return false;
+            }
 
-            return suffix[0] == ':' && TryParsePort(suffix.Substring(1), out port);
+            string suffix = address.Substring(closingBracket + 1);
+            if (suffix.Length > 0 && (suffix[0] != ':' || !TryParsePort(suffix.Substring(1), out port)))
+            {
+                return false;
+            }
+
+            host = bracketedHost;
+            return true;
+        }
+
+        if (address.IndexOf('[') >= 0 || address.IndexOf(']') >= 0)
+        {
+            return false;
         }
 
         int firstColon = address.IndexOf(':');
         int lastColon = address.LastIndexOf(':');
         if (firstColon >= 0 && firstColon == lastColon)
         {
-            host = address.Substring(0, firstColon).Trim();
-            return host.Length > 0 && TryParsePort(address.Substring(firstColon + 1), out port);
+            string candidateHost = address.Substring(0, firstColon).Trim();
+            if (!IsValidHostOrIpAddress(candidateHost) ||
+                !TryParsePort(address.Substring(firstColon + 1), out port))
+            {
+                return false;
+            }
+
+            host = candidateHost;
+            return true;
         }
 
-        if (firstColon >= 0 && !IPAddress.TryParse(address, out _)) return false;
+        if (firstColon >= 0)
+        {
+            if (!TryParseLiteralIpAddress(address, out var ipv6) ||
+                ipv6.AddressFamily != AddressFamily.InterNetworkV6)
+            {
+                return false;
+            }
+
+            host = address;
+            return true;
+        }
+
+        if (!IsValidHostOrIpAddress(address))
+        {
+            return false;
+        }
 
         host = address;
         return true;
+    }
+
+    public static IPAddress ResolveHostAddress(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return null;
+
+        string normalizedHost = NormalizeBracketedHost(host);
+        if (TryParseLiteralIpAddress(normalizedHost, out var enteredIp))
+        {
+            return NormalizeIpAddress(enteredIp);
+        }
+
+        var addresses = Dns.GetHostAddresses(normalizedHost);
+        var ipv4 = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+        if (ipv4 != null)
+        {
+            return ipv4;
+        }
+
+        if (Socket.OSSupportsIPv6)
+        {
+            var ipv6 = addresses.FirstOrDefault(x =>
+                x.AddressFamily == AddressFamily.InterNetworkV6 &&
+                !x.IsIPv6Multicast &&
+                !x.IsIPv6SiteLocal);
+            if (ipv6 != null)
+            {
+                return NormalizeIpAddress(ipv6);
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeBracketedHost(string host)
+    {
+        string trimmed = host.Trim();
+        if (trimmed.Length >= 2 && trimmed[0] == '[' && trimmed[trimmed.Length - 1] == ']')
+        {
+            return trimmed.Substring(1, trimmed.Length - 2).Trim();
+        }
+
+        return trimmed;
+    }
+
+    private static IPAddress NormalizeIpAddress(IPAddress address)
+    {
+        if (address != null &&
+            address.AddressFamily == AddressFamily.InterNetworkV6 &&
+            address.IsIPv4MappedToIPv6)
+        {
+            return address.MapToIPv4();
+        }
+
+        return address;
+    }
+
+    private static bool TryParseLiteralIpAddress(string candidate, out IPAddress address)
+    {
+        address = null;
+        if (string.IsNullOrWhiteSpace(candidate)) return false;
+
+        // Avoid treating plain integer strings (e.g. "12345") as IPv4 literals unless dotted-quad or IPv6.
+        if (candidate.IndexOf(':') < 0 && candidate.Split('.').Length != 4)
+        {
+            return false;
+        }
+
+        return IPAddress.TryParse(candidate, out address) &&
+            (address.AddressFamily == AddressFamily.InterNetwork ||
+             address.AddressFamily == AddressFamily.InterNetworkV6);
+    }
+
+    private static bool IsValidHostOrIpAddress(string candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate)) return false;
+
+        if (TryParseLiteralIpAddress(candidate, out _))
+        {
+            return true;
+        }
+
+        // Reject malformed numeric dotted strings like "999.999.999.999" that look like IPv4 but failed TryParse.
+        if (candidate.All(c => char.IsDigit(c) || c == '.'))
+        {
+            return false;
+        }
+
+        var hostType = Uri.CheckHostName(candidate);
+        return hostType == UriHostNameType.Dns ||
+               hostType == UriHostNameType.IPv4 ||
+               hostType == UriHostNameType.IPv6;
     }
 
     private static bool TryParsePort(string enteredPort, out int port)
@@ -680,8 +802,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     private static bool IsLoopbackAddress(string address)
     {
-        return string.Equals(address, "localhost", StringComparison.OrdinalIgnoreCase) ||
-            (IPAddress.TryParse(address, out var ip) && IPAddress.IsLoopback(ip));
+        string normalized = NormalizeBracketedHost(address);
+        return string.Equals(normalized, "localhost", StringComparison.OrdinalIgnoreCase) ||
+            (IPAddress.TryParse(normalized, out var ip) && IPAddress.IsLoopback(ip));
     }
 }
 

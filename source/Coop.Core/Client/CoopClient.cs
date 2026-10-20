@@ -41,6 +41,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private readonly IMessagePacketHandler messagePacketHandler;
     private bool isConnected = false;
     private bool reconnectPending = false;
+    private bool preferIPv6OnReconnect = false;
     private DateTime reconnectAfter = DateTime.MinValue;
 
     public CoopClient(
@@ -215,17 +216,29 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         }
 
         reconnectPending = false;
+        preferIPv6OnReconnect = false;
         reconnectAfter = DateTime.MinValue;
 
-        var ip = ResolveConnectAddress(Config.Address, preferIPv6: false);
+        IPAddress ip;
+        try
+        {
+            ip = ResolveConnectAddress(Config.Address, preferIPv6: false);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to resolve server address '{Address}' on port {Port}", Config.Address, Config.Port);
+            throw;
+        }
+
         ServerEndpoint = new IPEndPoint(ip, Config.Port);
 
         if (!HasCompatibleLiteNetLib()) return;
 
+        netManager.IPv6Enabled = Socket.OSSupportsIPv6;
         netManager.Start();
         StartNetworkPoller();
 
-        Logger.Information("Attempting connection to {Endpoint}...", ServerEndpoint);
+        Logger.Information("Attempting connection to {Endpoint} ({AddressFamily})...", ServerEndpoint, ServerEndpoint.AddressFamily);
         netManager.Connect(ServerEndpoint, Config.Token);
     }
 
@@ -265,24 +278,65 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     private static IPAddress ResolveConnectAddress(string address, bool preferIPv6)
     {
-        if (IPAddress.TryParse(address, out var parsed))
-            return parsed;
+        if (string.IsNullOrWhiteSpace(address))
+            throw new ArgumentException("Server address cannot be null or empty.", nameof(address));
 
-        var addresses = Dns.GetHostAddresses(address)
+        string normalized = NormalizeAddressString(address);
+
+        if (IPAddress.TryParse(normalized, out var parsed))
+        {
+            parsed = NormalizeIpAddress(parsed);
+            if (parsed.AddressFamily == AddressFamily.InterNetworkV6 && !Socket.OSSupportsIPv6)
+            {
+                Logger.Error("IPv6 address '{Address}' was specified, but the operating system does not support IPv6", address);
+                throw new InvalidOperationException($"IPv6 is not supported on this machine for address: {address}");
+            }
+
+            return parsed;
+        }
+
+        var addresses = Dns.GetHostAddresses(normalized)
+            .Select(NormalizeIpAddress)
             .Where(IsUsableConnectAddress)
             .ToArray();
 
-        var preferredFamily = preferIPv6
+        var preferredFamily = preferIPv6 && Socket.OSSupportsIPv6
             ? AddressFamily.InterNetworkV6
             : AddressFamily.InterNetwork;
 
-        var fallbackFamily = preferIPv6
+        var fallbackFamily = preferredFamily == AddressFamily.InterNetworkV6
             ? AddressFamily.InterNetwork
             : AddressFamily.InterNetworkV6;
 
         return addresses.FirstOrDefault(x => x.AddressFamily == preferredFamily)
             ?? addresses.FirstOrDefault(x => x.AddressFamily == fallbackFamily)
-            ?? throw new InvalidOperationException($"Could not resolve usable address: {address}");
+            ?? throw new InvalidOperationException($"Could not resolve usable IPv4/IPv6 address for '{address}'");
+    }
+
+    private static string NormalizeAddressString(string address)
+    {
+        string trimmed = address.Trim();
+        if (trimmed.Length >= 2 && trimmed[0] == '[' && trimmed[trimmed.Length - 1] == ']')
+        {
+            return trimmed.Substring(1, trimmed.Length - 2).Trim();
+        }
+
+        return trimmed;
+    }
+
+    private static IPAddress NormalizeIpAddress(IPAddress address)
+    {
+        // LiteNetLib binds separate IPv4 and IPv6 sockets (with DualMode = false on the IPv6 socket),
+        // so IPv4-mapped IPv6 addresses (::ffff:a.b.c.d) must be normalized to InterNetwork (IPv4)
+        // so LiteNetLib routes them through its IPv4 socket instead of failing with AddressNotAvailable.
+        if (address != null &&
+            address.AddressFamily == AddressFamily.InterNetworkV6 &&
+            address.IsIPv4MappedToIPv6)
+        {
+            return address.MapToIPv4();
+        }
+
+        return address;
     }
 
     private static bool IsUsableConnectAddress(IPAddress address)
@@ -292,7 +346,8 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         if (address.AddressFamily == AddressFamily.InterNetworkV6)
         {
-            return !address.IsIPv6LinkLocal
+            return Socket.OSSupportsIPv6
+                && !address.IsIPv6LinkLocal
                 && !address.IsIPv6Multicast
                 && !address.IsIPv6SiteLocal;
         }
@@ -310,6 +365,17 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
         {
             reconnectPending = false;
+            preferIPv6OnReconnect = !preferIPv6OnReconnect;
+
+            try
+            {
+                var ip = ResolveConnectAddress(Config.Address, preferIPv6: preferIPv6OnReconnect);
+                ServerEndpoint = new IPEndPoint(ip, Config.Port);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Could not re-resolve '{Address}' during reconnect; reusing {Endpoint}", Config.Address, ServerEndpoint);
+            }
 
             messageBroker.Publish(this, new SendInformationMessage("Retrying connection to server..."));
             Logger.Information("Retrying connection to {Endpoint}...", ServerEndpoint);

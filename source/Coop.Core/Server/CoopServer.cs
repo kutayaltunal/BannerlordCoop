@@ -216,6 +216,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     {
         Logger.Information("Server starting on port {Port}", Config.Port);
 
+        netManager.IPv6Enabled = Socket.OSSupportsIPv6;
         if (netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port))
         {
             Logger.Information("Server listening on UDP port {Port}", netManager.LocalPort);

@@ -135,6 +135,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
         netManager = new NetManager(this)
         {
+            IPv6Enabled = Socket.OSSupportsIPv6,
             NatPunchEnabled = true,
             DisconnectTimeout = (int)Config.DisconnectTimeout.TotalMilliseconds,
             PingInterval = (int)Config.PingInterval.TotalMilliseconds,

@@ -23,6 +23,7 @@ namespace IntroServer.Server
 	        _logger = logger;
 	        _netManager = new NetManager(this)
             {
+                IPv6Enabled = Socket.OSSupportsIPv6,
                 NatPunchEnabled = true,
                 //DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
                 //PingInterval = config.PingInterval.Milliseconds,
@@ -30,8 +31,9 @@ namespace IntroServer.Server
             };
             _netManager.NatPunchModule.Init(this);
 
-            if(_netManager.Start(config.NATType == NatAddressType.Internal 
-	            ? config.LanPort : config.WanPort) == false)
+            int listenPort = config.NATType == NatAddressType.Internal
+                ? config.LanPort : config.WanPort;
+            if(_netManager.Start(IPAddress.Any, IPAddress.IPv6Any, listenPort) == false)
             {
                 _logger.LogError("Failed to start server");
             }

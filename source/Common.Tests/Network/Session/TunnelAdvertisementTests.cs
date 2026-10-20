@@ -47,7 +47,10 @@ public class TunnelAdvertisementTests
 
     [Theory]
     [InlineData("localhost")]
+    [InlineData("LOCALHOST")]
     [InlineData("127.0.0.1")]
+    [InlineData("::1")]
+    [InlineData("[::1]")]
     public void LoopbackSession_StartsTunnelAndKeepsTunnelVersion(string address)
     {
         var host = new FakeTunnelHost();

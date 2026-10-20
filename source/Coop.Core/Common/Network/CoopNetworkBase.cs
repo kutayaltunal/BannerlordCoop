@@ -54,6 +54,7 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
 
         netManager = new NetManager(this)
         {
+            IPv6Enabled = Socket.OSSupportsIPv6,
             DisconnectTimeout = (int)configuration.DisconnectTimeout.TotalMilliseconds,
             // Two reliable lanes: 0 for the world-change stream, BulkChannel for large transfers.
             // Each channel has its own (small, fixed) reliable window, so a multi-MB transfer
