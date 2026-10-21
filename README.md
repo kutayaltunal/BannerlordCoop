@@ -6,22 +6,28 @@
 
 Build armies, manage kingdoms, fight battles, trade, raid settlements, and conquer Calradia together in a shared multiplayer campaign.
 
-[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3770450698) &nbsp;•&nbsp;
-[Discord](https://discord.gg/VXqGyT8) &nbsp;•&nbsp;
-[Reddit](https://www.reddit.com/r/BannerlordCoop/) &nbsp;•&nbsp;
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3770450698) &nbsp;â€¢&nbsp;
+[Discord](https://discord.gg/VXqGyT8) &nbsp;â€¢&nbsp;
+[Reddit](https://www.reddit.com/r/BannerlordCoop/) &nbsp;â€¢&nbsp;
 [Support the project](#support-bannerlord-coop)
 
 ## About the Mod
 
 Bannerlord Coop transforms Bannerlord's single-player campaign into a cooperative multiplayer experience.
 
-Players share the same persistent campaign world while controlling their own characters, parties, clans, troops, and resources. Travel across the campaign map together, interact with settlements and NPC parties, or fight alongside — and against — other players.
+Players share the same persistent campaign world while controlling their own characters, parties, clans, troops, and resources. Travel across the campaign map together, interact with settlements and NPC parties, or fight alongside â€” and against â€” other players.
 
 The mod is currently optimized for campaigns with up to **8 players**. Larger groups may work, but could experience reduced performance and stability.
 
 ## Installation
 
 Subscribe on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3770450698), then enable the **Coop** module in the Bannerlord launcher.
+
+### Quick Start (Source / Standalone - Steam & Epic Games)
+If you cloned or downloaded this repository:
+1. Double-click start-coop.cmd in the repository root (or run powershell ./start-coop.ps1).
+2. The launcher will automatically locate your Bannerlord installation (Steam or Epic Games), link it, build the mod in Release mode, and launch the game with the required modules enabled.
+3. You can also select option [4] in the menu to create one-click shortcuts on your Desktop!
 
 Join our [Discord](https://discord.gg/VXqGyT8) for installation help, announcements, bug reports, playtests, and community discussion.
 
@@ -58,7 +64,7 @@ Compatibility with other mods is not guaranteed.
 
 ## Feedback and Bug Reports
 
-Please share your honest experience with the mod — good or bad. Detailed feedback and reproducible bug reports are extremely valuable and help us improve stability, performance, and gameplay.
+Please share your honest experience with the mod â€” good or bad. Detailed feedback and reproducible bug reports are extremely valuable and help us improve stability, performance, and gameplay.
 
 Report bugs in our [Discord](https://discord.gg/VXqGyT8) or via [GitHub issues](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues), and please include:
 
@@ -74,11 +80,11 @@ Bannerlord Coop is developed by a volunteer team and will always be available fo
 
 Support helps cover development tools, hosting infrastructure, dedicated servers, distribution costs, and other project expenses. Choose whichever platform works best for you:
 
-- [**Patreon**](https://www.patreon.com/16338430/join) — Become a monthly supporter
-- [**Buy Me a Coffee**](https://buymeacoffee.com/bannerlordcoop) — Send a one-time contribution
-- [**PayPal**](https://www.paypal.com/donate/?hosted_button_id=KHBSK4FXQ9GKS) — Donate directly
-- [**Afdian**](https://ifdian.net/a/BannerlordCoop) — Support us from China
-- [**Boosty**](https://boosty.to/bannerlordcoop/donate) — Additional international support option
+- [**Patreon**](https://www.patreon.com/16338430/join) â€” Become a monthly supporter
+- [**Buy Me a Coffee**](https://buymeacoffee.com/bannerlordcoop) â€” Send a one-time contribution
+- [**PayPal**](https://www.paypal.com/donate/?hosted_button_id=KHBSK4FXQ9GKS) â€” Donate directly
+- [**Afdian**](https://ifdian.net/a/BannerlordCoop) â€” Support us from China
+- [**Boosty**](https://boosty.to/bannerlordcoop/donate) â€” Additional international support option
 
 **Financial support is completely optional.** Playing the mod, reporting bugs, creating content, and sharing Bannerlord Coop also help the project tremendously.
 
