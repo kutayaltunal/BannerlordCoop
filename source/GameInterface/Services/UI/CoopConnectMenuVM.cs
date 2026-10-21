@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
@@ -32,7 +32,7 @@ public enum SteamLobbyPasswordFilter
 /// <summary>View model for direct connection and public standalone Steam-lobby discovery.</summary>
 public class CoopConnectMenuVM : ViewModel, IDisposable
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CoopConnectMenuVM>();
+    private static ILogger Logger => LogManager.GetLogger<CoopConnectMenuVM>();
 
     public const string DirectTabId = "direct";
     public const string SteamLobbiesTabId = "steam_lobbies";
